@@ -1,18 +1,10 @@
-/**
- * محرك مِشكاة المحلي: تحليل السؤال، ثم تركيب إجابة عربية منظمة
- * من القاعدة المعرفية (نوع السؤال، الحكم، التفصيل، الأدلة، التطبيق).
- */
-
-import { KNOWLEDGE, type KnowledgeEntry, type KnowledgeSource } from "./knowledge-base";
-
 export type AnswerMode = "واسع" | "عملي" | "تعليمي";
 export type AnswerDepth = "مختصر" | "متوازن" | "متعمق";
 
-export type QuestionAnalysisInfo = {
-  kindLabel: string;
-  keywords: string[];
-  topics: string[];
-  isReligious: boolean;
+export type KnowledgeSource = {
+  title: string;
+  category: string;
+  signal: string;
 };
 
 export type LocalAnswer = {
@@ -21,142 +13,326 @@ export type LocalAnswer = {
   sources: KnowledgeSource[];
   followUps: string[];
   matchedTopic: string;
-  analysis: QuestionAnalysisInfo;
 };
 
-/* ---------------- التطبيع والجذر ---------------- */
+type KnowledgeEntry = {
+  id: string;
+  title: string;
+  category: string;
+  keywords: string[];
+  summary: string;
+  details: string[];
+  practical: string[];
+  teaching: string[];
+  sources: KnowledgeSource[];
+  followUps: string[];
+};
+
+const STOP_WORDS = new Set([
+  "ما",
+  "ماذا",
+  "كيف",
+  "هل",
+  "لماذا",
+  "متى",
+  "اين",
+  "من",
+  "عن",
+  "في",
+  "على",
+  "الى",
+  "إلى",
+  "هو",
+  "هي",
+  "هذا",
+  "هذه",
+  "ذلك",
+  "تلك",
+  "انا",
+  "أنا",
+  "اريد",
+  "أريد",
+  "ارغب",
+  "ممكن",
+  "لي",
+  "مع",
+  "أن",
+  "ان",
+  "و",
+  "يا",
+]);
+
+const KNOWLEDGE: KnowledgeEntry[] = [
+  {
+    id: "learning",
+    title: "التعلم الفعّال",
+    category: "تعلم وتطوير",
+    keywords: [
+      "تعلم",
+      "دراسة",
+      "مذاكرة",
+      "حفظ",
+      "مهارة",
+      "كتاب",
+      "فهم",
+      "تركيز",
+      "علم",
+      "اتقان",
+    ],
+    summary:
+      "التعلم الفعّال ليس جمع ساعات طويلة، بل بناء دورة واضحة: فهم، ثم استرجاع من الذاكرة، ثم تطبيق، ثم مراجعة متباعدة.",
+    details: [
+      "ابدأ بتحديد ناتج قابل للملاحظة: ما الذي ستستطيع فعله بعد انتهاء الجلسة؟ قراءة فصل كامل ليست ناتجًا كافيًا؛ حل خمس مسائل أو شرح فكرة دون النظر إلى الملاحظات ناتج أفضل.",
+      "حوّل المادة إلى أسئلة قبل أن تحفظها. محاولة الإجابة من الذاكرة تكشف الفجوات أسرع من إعادة القراءة، وتبني روابط أقوى بين المفاهيم.",
+      "المراجعة المتباعدة أفضل من جلسة واحدة مكثفة. راجع الفكرة بعد يوم، ثم بعد عدة أيام، ثم بعد أسبوع، مع تقليل المساعدة في كل مرة.",
+    ],
+    practical: [
+      "خصص جلسة من 25 دقيقة: 5 دقائق لتحديد الهدف، 15 دقيقة للتطبيق دون ملاحظات، و5 دقائق لتسجيل ما لم يتضح.",
+      "في نهاية كل جلسة اكتب ثلاثة أسئلة اختبارية وأجب عنها في اليوم التالي قبل فتح الكتاب.",
+      "اختر مشروعًا صغيرًا يثبت المهارة؛ المعرفة التي لا تدخل في استخدام حقيقي يصعب الاحتفاظ بها.",
+    ],
+    teaching: [
+      "التذكر ليس درجًا يصعد مرة واحدة؛ هو مسار يقوى كلما استدعيت المعلومة من الذاكرة بعد أن تبدأ في نسيانها.",
+      "الفهم العميق يظهر عندما تستطيع شرح الفكرة بلغة بسيطة، ذكر مثال عليها، وتحديد متى لا تنطبق.",
+    ],
+    sources: [
+      { title: "مبادئ الاسترجاع النشط", category: "تعلم", signal: "قاعدة معرفية داخلية" },
+      { title: "المراجعة المتباعدة", category: "تعلم", signal: "قاعدة معرفية داخلية" },
+    ],
+    followUps: ["كيف أبني خطة دراسة أسبوعية؟", "كيف أتغلب على التشتت أثناء التعلم؟"],
+  },
+  {
+    id: "focus",
+    title: "التركيز وإدارة الوقت",
+    category: "حياة يومية",
+    keywords: [
+      "وقت",
+      "تركيز",
+      "تشتت",
+      "انتاجية",
+      "إنتاجية",
+      "تسويف",
+      "عادة",
+      "عمل",
+      "مهام",
+      "تنظيم",
+      "روتين",
+    ],
+    summary:
+      "التركيز نتيجة تصميم البيئة وتحديد الأولوية، وليس اختبارًا دائمًا لقوة الإرادة. كلما قلّت القرارات والمقاطعات، أصبح البدء أسهل.",
+    details: [
+      "اختر مهمة واحدة ذات أثر واضح، وصغها كخطوة أولى صغيرة. عبارة «أنجز المشروع» ثقيلة، بينما «اكتب العناوين الثلاثة الأولى» قابلة للبدء.",
+      "اجعل المقاطعات مكلفة قليلًا: أبعد الهاتف، أغلق التبويبات غير اللازمة، واستخدم فترة اتصال محددة بدل التحقق المستمر.",
+      "اترك مساحة انتقال بين المهام. الانتقال المباشر يجعل الذهن يحمل بقايا المهمة السابقة ويزيد شعور الفوضى.",
+    ],
+    practical: [
+      "اكتب قبل النوم أهم مهمة واحدة للغد، وحدد أول فعل يستغرق أقل من عشر دقائق.",
+      "اعمل في دورة 40 دقيقة تركيز و10 دقائق راحة، ثم عدّلها حسب طبيعة عملك.",
+      "أنشئ قائمة توقف: ثلاثة أشياء لن تفعلها الآن. وضوح ما تؤجله يحمي الأولوية من التوسع.",
+    ],
+    teaching: [
+      "التسويف غالبًا لا يعني الكسل؛ قد يعني أن المهمة غامضة أو كبيرة أو مرتبطة بخوف من النتيجة. صغّرها حتى تصبح واضحة.",
+      "الروتين الناجح لا يطلب منك أن تكون متحمسًا كل يوم؛ هو يضع بداية معروفة حتى في الأيام منخفضة الطاقة.",
+    ],
+    sources: [
+      { title: "هندسة البيئة للتركيز", category: "إنتاجية", signal: "نمط استدلال داخلي" },
+      { title: "تصغير الخطوة الأولى", category: "عادات", signal: "نمط استدلال داخلي" },
+    ],
+    followUps: ["كيف أبني روتينًا واقعيًا؟", "ما أفضل طريقة للتخلص من التسويف؟"],
+  },
+  {
+    id: "faith",
+    title: "الإيمان والسلوك",
+    category: "قيم وإيمان",
+    keywords: [
+      "إيمان",
+      "دين",
+      "اسلام",
+      "إسلام",
+      "عبادة",
+      "صلاة",
+      "قرآن",
+      "قران",
+      "دعاء",
+      "نية",
+      "اخلاق",
+      "أخلاق",
+      "توبة",
+      "ذنوب",
+      "قلب",
+    ],
+    summary:
+      "المعنى العملي للإيمان يظهر في صلة الإنسان بربه، وفي صدقه ورحمته وأمانته مع الناس. النمو الروحي مسار مستمر لا نتيجة لحظة واحدة.",
+    details: [
+      "ابدأ بالثوابت قبل الإضافات: حافظ على الفرائض قدر استطاعتك، ثم ابنِ حولها عادة صغيرة من القرآن أو الذكر أو الدعاء بدل قائمة كبيرة تنقطع سريعًا.",
+      "النية تعطي العمل اتجاهه، لكن النية وحدها لا تغني عن السلوك. راقب أثر العبادة في الصدق والرفق وضبط اللسان ورد الحقوق.",
+      "عند الخطأ، اجمع بين الاعتراف والرجوع والإصلاح. اليأس يعطل التوبة، والتساهل مع الخطأ يمنع التعلم منه.",
+    ],
+    practical: [
+      "اختر وقتًا ثابتًا يوميًا لقراءة قليلة بتدبر، واكتب معنى واحدًا ستجربه في يومك.",
+      "اجعل لك مراجعة أسبوعية هادئة: ما خلق تحسن؟ ما حق قصرت فيه؟ وما خطوة الإصلاح الأصغر؟",
+      "في المسائل الفقهية الخاصة أو الخلافية، اعرض حالتك على عالم موثوق؛ الإجابة العامة لا تغني عن معرفة التفاصيل.",
+    ],
+    teaching: [
+      "الاستقامة ليست غياب التقصير، بل سرعة الرجوع بعده ووضوح الاتجاه في القرارات اليومية.",
+      "الأخلاق ليست طبقة منفصلة عن العبادة؛ هي من أكثر المواضع التي يظهر فيها صدق أثرها.",
+    ],
+    sources: [
+      { title: "الإيمان كمسار سلوكي", category: "قيم وإيمان", signal: "معرفة داخلية عامة" },
+      { title: "التدرج في بناء العبادة", category: "تزكية", signal: "معرفة داخلية عامة" },
+    ],
+    followUps: ["كيف أثبت على العبادة دون انقطاع؟", "كيف أتعامل مع الشعور بالذنب؟"],
+  },
+  {
+    id: "writing",
+    title: "الكتابة والتعبير",
+    category: "لغة وأفكار",
+    keywords: [
+      "كتابة",
+      "مقال",
+      "رسالة",
+      "تعبير",
+      "لغة",
+      "محتوى",
+      "قصة",
+      "تلخيص",
+      "عرض",
+      "اقناع",
+      "إقناع",
+    ],
+    summary:
+      "الكتابة الواضحة تبدأ من فكرة واحدة للقارئ، ثم ترتيب منطقي يجعل كل فقرة تؤدي وظيفة محددة دون زحام أو استعراض.",
+    details: [
+      "عرّف القارئ والنتيجة قبل كتابة الجملة الأولى: ماذا يعرف؟ ماذا يحتاج؟ وما القرار أو الفهم الذي تريده في النهاية؟",
+      "اكتب مسودة سريعة ثم حررها على مرحلتين: مرة للمعنى والترتيب، ومرة للعبارة والإيقاع. محاولة تحسين كل جملة أثناء المسودة تبطئ التفكير.",
+      "اجعل العنوان وعدًا صادقًا، واجعل المقدمة توضح لماذا يهم الموضوع. بعدها استخدم أمثلة ملموسة قبل العودة إلى الخلاصة.",
+    ],
+    practical: [
+      "اكتب الفكرة في جملة واحدة، ثم أضف تحتها ثلاث نقاط فقط. إذا احتجت أكثر، اجمع المتشابه قبل التوسع.",
+      "استبدل الكلمات العامة بفعل أو صورة محددة: بدل «تحسين الأداء» اذكر «تقليل وقت الانتظار من خمس دقائق إلى دقيقة».",
+      "اقرأ النص بصوت مسموع؛ الجمل التي تتعثر في النطق غالبًا تحتاج إلى تبسيط.",
+    ],
+    teaching: [
+      "الوضوح ليس تبسيطًا مخلًا؛ هو أن يصل التعقيد الحقيقي دون ضوضاء لغوية.",
+      "المحرر الجيد لا يسأل فقط: هل الجملة جميلة؟ بل يسأل: هل يحتاجها القارئ هنا؟",
+    ],
+    sources: [
+      { title: "هرم الوضوح", category: "كتابة", signal: "قاعدة تحرير داخلية" },
+      { title: "الكتابة من منظور القارئ", category: "تواصل", signal: "قاعدة تحرير داخلية" },
+    ],
+    followUps: ["كيف ألخص كتابًا في صفحة؟", "ساعدني في تحسين رسالة رسمية"],
+  },
+  {
+    id: "thinking",
+    title: "التفكير النقدي والقرار",
+    category: "تفكير وقرار",
+    keywords: [
+      "تفكير",
+      "قرار",
+      "نقد",
+      "منطق",
+      "مشكلة",
+      "رأي",
+      "حقيقة",
+      "دليل",
+      "اختيار",
+      "مقارنة",
+      "شك",
+      "تحليل",
+    ],
+    summary:
+      "التفكير النقدي ليس رفض كل شيء، بل فصل السؤال عن الانطباع، وفصل الدليل عن التفسير، ثم اتخاذ قرار يناسب مستوى اليقين والمخاطرة.",
+    details: [
+      "اسأل أولًا: ما الادعاء الدقيق؟ كثير من الخلافات تستمر لأن الأطراف تناقش عبارات واسعة لا يمكن اختبارها.",
+      "ميّز بين المعلومة والاستنتاج والتوقع. قد تكون المعلومة صحيحة لكن الاستنتاج أوسع منها، أو يكون التوقع ممكنًا دون أن يكون مرجحًا.",
+      "ابحث عن ما قد يثبت خطأ رأيك قبل أن تجمع ما يؤيده. هذه الخطوة تقلل التحيز وتكشف الافتراضات المخفية.",
+    ],
+    practical: [
+      "اكتب ثلاثة أعمدة: ما أعرفه، ما أظنه، ما أحتاج إلى التحقق منه.",
+      "للقرارات المهمة، حدّد أسوأ نتيجة معقولة، واحتمالها، وما الذي يمكنك فعله لتقليل أثرها.",
+      "لا تنتظر يقينًا كاملًا في القرارات القابلة للعكس؛ اجمع معلومات كافية ثم جرّب بخطوة صغيرة.",
+    ],
+    teaching: [
+      "الشك الصحي يطلب دليلًا، أما الشك المعطل فيطلب ضمانًا لا توفره الحياة.",
+      "جودة القرار لا تقاس بنتيجته وحدها؛ القرار الجيد قد ينتج عنه حظ سيئ، والعكس صحيح.",
+    ],
+    sources: [
+      { title: "فصل الادعاء عن الدليل", category: "تفكير", signal: "إطار تحليلي داخلي" },
+      { title: "القرار تحت عدم اليقين", category: "قرار", signal: "إطار تحليلي داخلي" },
+    ],
+    followUps: ["كيف أفرق بين الرأي والحقيقة؟", "ساعدني في تحليل قرار متردد فيه"],
+  },
+  {
+    id: "wellbeing",
+    title: "العافية والتوازن",
+    category: "حياة يومية",
+    keywords: [
+      "صحة",
+      "نوم",
+      "توتر",
+      "قلق",
+      "راحة",
+      "مزاج",
+      "ضغط",
+      "توازن",
+      "رياضة",
+      "غذاء",
+      "طاقة",
+    ],
+    summary:
+      "العافية شبكة من أساسيات صغيرة: نوم منتظم نسبيًا، حركة، طعام مناسب، علاقات آمنة، ومساحة لاستعادة الانتباه. لا يوجد عنصر واحد يصلح لكل شخص.",
+    details: [
+      "راقب النمط قبل البحث عن حل سريع. متى يبدأ التعب؟ ما الذي يسبقه؟ وما الذي يخففه؟ تسجيل الملاحظات لأيام يوضح ما لا يظهر في لحظة القلق.",
+      "قسّم التغيير إلى حد أدنى قابل للاستمرار: مشي قصير، وقت نوم أقرب إلى الثبات، أو إغلاق الشاشة قبل النوم بمدة.",
+      "إذا كان القلق أو الحزن شديدًا أو مستمرًا أو يؤثر في الأمان والقدرة على الحياة، فطلب مساعدة مختص خطوة قوة لا فشل.",
+    ],
+    practical: [
+      "ابدأ اليوم بثلاثة مؤشرات فقط: وقت النوم والاستيقاظ، دقائق الحركة، ومستوى الطاقة من 1 إلى 5.",
+      "استخدم التنفس البطيء أو المشي القصير لخفض شدة التوتر، ثم اتخذ قرارك بعد أن يهدأ الجسم قليلًا.",
+      "لا تغيّر أربعة أشياء دفعة واحدة؛ اختر عادة واحدة لمدة أسبوع ثم راجع أثرها.",
+    ],
+    teaching: [
+      "الراحة ليست مكافأة بعد انتهاء كل شيء؛ هي جزء من النظام الذي يجعل الإنجاز ممكنًا.",
+      "النصيحة العامة لا تشخّص مرضًا ولا تستبدل الطبيب، خصوصًا عند وجود أعراض جديدة أو شديدة.",
+    ],
+    sources: [
+      { title: "مبادئ العافية اليومية", category: "عافية", signal: "معرفة داخلية عامة" },
+      { title: "متى تطلب مساعدة متخصصة", category: "عافية", signal: "إرشاد سلامة" },
+    ],
+    followUps: ["كيف أبني روتين نوم أفضل؟", "ما خطوات بسيطة لتخفيف التوتر؟"],
+  },
+];
 
 const normalize = (text: string) =>
   text
     .toLowerCase()
-    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
+    .replace(/[إأآا]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
-    .replace(/[؟?!،;:,.()[\]{}"'«»_]/g, " ")
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[؟?!،؛:.()[\]{}"']/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-
-const STOP_WORDS = new Set([
-  "ما", "ماذا", "كيف", "هل", "لماذا", "لماذ", "متى", "اين", "وين", "من",
-  "عن", "في", "على", "الى", "عند", "هو", "هي", "هذا", "هذه", "ذلك", "تلك",
-  "انا", "انت", "انتم", "اريد", "ارغب", "ممكن", "ممكنه", "لي", "مع", "ان",
-  "و", "يا", "اي", "او", "ثم", "فان", "التي", "الذي", "بين", "حول",
-  "اعرف", "عايز", "ابي", "احب",
-]);
 
 const tokens = (text: string) =>
   normalize(text)
     .split(" ")
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
 
-function stem(token: string): string {
-  let w = normalize(token);
-  if (w.length < 2) return w;
-  if (w.length >= 4 && w.startsWith("ال")) w = w.slice(2);
-  if (w.length > 3) {
-    const rest = w.slice(1);
-    // نحذف الألف المبدئية (احفظ→حفظ، اتعلم→تعلم) إلا في «استـ» (استخار)
-    const isAlifPrefix = w[0] === "ا" && w[1] !== "س";
-    if (rest.length >= 3 && (isAlifPrefix || "وفبكلس".includes(w[0]))) w = rest;
-  }
-  const suffixes = ["ات", "ون", "ين", "ان", "وه", "هم", "هن", "كم", "نا", "ك", "م", "ه", "ي"];
-  for (const s of suffixes) {
-    if (w.length - s.length >= 3 && w.endsWith(s)) {
-      w = w.slice(0, -s.length);
-      break;
-    }
-  }
-  // «ال» قد تظهر بعد إزالة لاحقة
-  if (w.length >= 4 && w.startsWith("ال")) w = w.slice(2);
-  return w;
-}
-
-function termsMatch(a: string, b: string): boolean {
-  const na = stem(a);
-  const nb = stem(b);
-  if (na.length < 2 || nb.length < 2) return false;
-  if (na === nb) return true;
-  if (na.length < 3 || nb.length < 3) return false;
-  const [long, short] = na.length >= nb.length ? [na, nb] : [nb, na];
-  return long.startsWith(short);
-}
-
-/* ---------------- تحليل السؤال ---------------- */
-
-type QuestionKind =
-  | "ruling"
-  | "difference"
-  | "evidence"
-  | "reason"
-  | "howto"
-  | "definition"
-  | "yesno"
-  | "detail";
-
-const KIND_LABELS: Record<QuestionKind, string> = {
-  ruling: "حكم شرعي",
-  difference: "فرق بين أمرين",
-  evidence: "طلب دليل",
-  reason: "حكمة أو سبب",
-  howto: "كيفية تطبيق",
-  definition: "تعريف وشرح",
-  yesno: "سؤال نعم/لا",
-  detail: "تفصيل وتوضيح",
-};
-
-const KIND_PATTERNS: Array<{ kind: QuestionKind; re: RegExp }> = [
-  { kind: "difference", re: /الفرق بين|فرق بين|ما الفرق/ },
-  { kind: "evidence", re: /ما الدليل|الدليل|ادله|هل ورد|ورد فيه|ورد عنه|هل في الكتاب|هل في السنه|ما دليل/ },
-  { kind: "ruling", re: /حكم|حلال|حرام|جائز|يجوز|مكروه|مسن|مستحب|افضل|الافضل|مبطل|مسقط|وجب/ },
-  { kind: "definition", re: /ما هو|ما هي|ما معني|معنى|تعريف|اشرح|وضح|يعني ايه/ },
-  { kind: "reason", re: /لماذا|لماذ|حكمه|الحكمه|السبب|سبب|عقله|ليش/ },
-  { kind: "howto", re: /كيف|طريقه|شروط|اركان|خطوات|افعل|اسوي|ادخل|ابدأ|ابدا|كيفيه/ },
-  { kind: "yesno", re: /^هل / },
-];
-
-const RELIGION_MARKERS = [
-  "دين", "اسلام", "الله", "ربي", "ربنا", "رسول", "نبي", "اسلاميه",
-  "شرعي", "شرعه", "فقه", "فقي", "فتاوي", "فتوا", "عالم دين", "مسلم",
-];
-
-function detectKind(normalized: string): QuestionKind {
-  for (const { kind, re } of KIND_PATTERNS) {
-    if (re.test(normalized)) return kind;
-  }
-  return "detail";
-}
-
-/* ---------------- المطابقة ---------------- */
-
 function scoreEntry(query: string, entry: KnowledgeEntry) {
   const queryTokens = tokens(query);
-  const normalizedQuery = normalize(query);
-  let score = 0;
-  const matchedKeywords = new Set<string>();
-
-  for (const keyword of entry.keywords) {
-    const kw = normalize(keyword);
-    const isMultiWord = kw.includes(" ");
-    const hit = isMultiWord
-      ? kw.length >= 5 && normalizedQuery.includes(kw)
-      : kw.length >= 2 && queryTokens.some((token) => termsMatch(token, kw));
-    if (hit) {
-      matchedKeywords.add(keyword);
-      score += isMultiWord ? 3 : Math.min(4, kw.length);
-    }
-  }
-
-  const titleTokens = tokens(entry.title);
-  const titleBoost = titleTokens.some((titleToken) =>
-    queryTokens.some((token) => termsMatch(token, titleToken)),
-  )
-    ? 5
-    : 0;
-  score += titleBoost;
-  return { score, matchedKeywords: [...matchedKeywords] };
+  const keywords = entry.keywords.map(normalize);
+  const hits = queryTokens.filter((token) =>
+    keywords.some(
+      (keyword) =>
+        keyword === token ||
+        keyword.startsWith(token) ||
+        token.startsWith(keyword),
+    ),
+  );
+  const direct = new Set(hits).size;
+  const phraseBoost = normalize(query).includes(normalize(entry.title)) ? 3 : 0;
+  return direct * 2 + phraseBoost;
 }
 
 function confidence(score: number) {
@@ -169,22 +345,12 @@ function greeting(query: string) {
   );
 }
 
-/* ---------------- تركيب الإجابة ---------------- */
-
 export function answerLocally(
   query: string,
   mode: AnswerMode = "واسع",
   depth: AnswerDepth = "متوازن",
 ): LocalAnswer {
   const clean = query.trim();
-
-  const baseAnalysis: QuestionAnalysisInfo = {
-    kindLabel: KIND_LABELS[detectKind(normalize(clean || ""))],
-    keywords: tokens(clean).slice(0, 5),
-    topics: [],
-    isReligious: false,
-  };
-
   if (!clean) {
     return {
       answer: "اكتب سؤالك وسأرتّب لك الفكرة في إجابة واضحة.",
@@ -192,77 +358,43 @@ export function answerLocally(
       sources: [],
       followUps: ["ما الذي تريد فهمه اليوم؟"],
       matchedTopic: "بداية",
-      analysis: baseAnalysis,
     };
   }
 
   if (greeting(clean)) {
     return {
       answer:
-        "وعليكم السلام ورحمة الله وبركاته.\n\nأنا مِشكاة، مساعد عربي مستقل يعمل بمحرك معرفة محلي داخل التطبيق. أتحللّ سؤالك، وأبحث في فيديوهات قناة «تعلم دينك لتنجو وتسعد»، وأجيب عن الأسئلة الدينية والعامة من قاعدة معرفية تفصيلية — مع توضيح مستوى الثقة بدل ادعاء معرفة لا أملكها.\n\nاكتب سؤالك كما يخطر لك، أو ابدأ بكلمة واحدة وسأساعدك على توسيعه.",
+        "وعليكم السلام ورحمة الله وبركاته.\n\nأنا مِشكاة، مساعد عربي مستقل يعمل بمحرك معرفة محلي داخل التطبيق. أستطيع مساعدتك في التعلم، تنظيم الأفكار، الكتابة، العادات، القيم، والأسئلة اليومية — مع توضيح مستوى الثقة بدل ادعاء معرفة لا أملكها.\n\nاكتب سؤالك كما يخطر لك، أو ابدأ بكلمة واحدة وسأساعدك على توسيعه.",
       confidence: 99,
       sources: [{ title: "هوية مِشكاة", category: "المحرك المحلي", signal: "إجابة مباشرة" }],
-      followUps: ["كيف تعمل؟", "ما هي أركان الصلاة؟"],
+      followUps: ["كيف تعمل؟", "أعطني فكرة أتعلمها اليوم"],
       matchedTopic: "ترحيب",
-      analysis: baseAnalysis,
     };
   }
 
-  const ranked = KNOWLEDGE.map((entry) => {
-    const { score, matchedKeywords } = scoreEntry(clean, entry);
-    return { entry, score, matchedKeywords };
-  }).sort((a, b) => b.score - a.score);
-
+  const ranked = KNOWLEDGE.map((entry) => ({ entry, score: scoreEntry(clean, entry) }))
+    .sort((a, b) => b.score - a.score);
   const best = ranked[0];
   const entry = best.score > 0 ? best.entry : KNOWLEDGE[0];
   const fallback = best.score === 0;
 
-  const kind = detectKind(normalize(clean));
-  const analysis: QuestionAnalysisInfo = {
-    kindLabel: KIND_LABELS[kind],
-    keywords: tokens(clean).slice(0, 5),
-    topics: [entry.title],
-    isReligious:
-      entry.religious ||
-      RELIGION_MARKERS.some((marker) => normalize(clean).includes(normalize(marker))),
-  };
-
-  const sections: string[] = [];
-
-  // تحليل السؤال
-  sections.push(
-    "**تحليل السؤال**\n" +
-      `نوع السؤال: ${analysis.kindLabel}${analysis.keywords.length ? ` · المصطلحات: ${analysis.keywords.join("، ")}` : ""}`,
-  );
-
-  sections.push(`## ${entry.title}`);
-  sections.push(entry.summary);
-
-  if (entry.ruling && depth !== "مختصر") {
-    sections.push(`### الحكم\n${entry.ruling}`);
-  }
+  const sections: string[] = [
+    `## ${entry.title}`,
+    entry.summary,
+  ];
 
   if (depth !== "مختصر") {
     sections.push(
-      `### التفصيل\n${entry.details
+      `\n### الفكرة الأساسية\n${entry.details
         .slice(0, depth === "متعمق" ? 3 : 2)
         .map((item, index) => `${index + 1}. ${item}`)
         .join("\n")}`,
     );
   }
 
-  if (entry.evidence.length > 0 && (mode === "تعليمي" || depth === "متعمق" || entry.religious)) {
-    sections.push(
-      `### من الكتاب والسنة\n${entry.evidence
-        .slice(0, depth === "متعمق" ? 3 : 2)
-        .map((item) => `- ${item}`)
-        .join("\n")}`,
-    );
-  }
-
   if (mode === "عملي" || depth === "متعمق") {
     sections.push(
-      `### جرّب الآن\n${entry.practical
+      `\n### جرّب الآن\n${entry.practical
         .slice(0, depth === "متعمق" ? 3 : 2)
         .map((item) => `- ${item}`)
         .join("\n")}`,
@@ -271,7 +403,7 @@ export function answerLocally(
 
   if (mode === "تعليمي" || depth === "متعمق") {
     sections.push(
-      `### تبسيط سريع\n${entry.teaching
+      `\n### تبسيط سريع\n${entry.teaching
         .slice(0, depth === "متعمق" ? 2 : 1)
         .map((item) => `- ${item}`)
         .join("\n")}`,
@@ -280,51 +412,21 @@ export function answerLocally(
 
   if (fallback) {
     sections.push(
-      "لم أجد تطابقًا قويًا مع موضوع محدد في المعرفة المحلية، لذلك بدأت بإطار عام. إذا أضفت سياقًا — المجال، الهدف، والنتيجة التي تريدها — سأضيّق الإجابة وأجعلها أنفع.",
+      "\nلم أجد تطابقًا قويًا مع موضوع محدد في المعرفة المحلية، لذلك بدأت بإطار عام. إذا أضفت سياقًا — المجال، الهدف، والنتيجة التي تريدها — سأضيّق الإجابة وأجعلها أنفع.",
     );
   }
 
-  const disclaimer = entry.religious
-    ? "\n> تنبيه: هذه إجابة معرفية عامة من محرك محلي، وليست فتوى رسمية. في المسائل الخاصة أو الخلافية، اعرض حالتك على عالم موثوق."
-    : "\n> تنبيه: هذه إجابة معرفية عامة من محرك محلي، وليست تشخيصًا أو استشارة مهنية متخصصة.";
-  sections.push(disclaimer);
+  sections.push(
+    "\n> تنبيه: هذه إجابة معرفية عامة من محرك محلي، وليست فتوى أو تشخيصًا أو استشارة مهنية متخصصة.",
+  );
 
   return {
-    answer: sections.join("\n\n"),
+    answer: sections.join("\n"),
     confidence: fallback ? 57 : confidence(best.score),
     sources: entry.sources,
     followUps: entry.followUps,
     matchedTopic: entry.title,
-    analysis,
   };
-}
-
-/**
- * نسخة مضغوطة من الإجابة المحلية، تُستخدم «إضافة معرفية» عندما لا تغطي
- * فيديوهات القناة السؤال بالكامل.
- */
-export function compactAnswer(query: string): {
-  title: string;
-  text: string;
-  followUps: string[];
-} | null {
-  const clean = query.trim();
-  if (!clean) return null;
-  const ranked = KNOWLEDGE.map((entry) => ({
-    entry,
-    score: scoreEntry(clean, entry).score,
-  })).sort((a, b) => b.score - a.score);
-  if (!ranked[0].score) return null;
-  const entry = ranked[0].entry;
-  const parts: string[] = [`## ${entry.title}`, entry.summary];
-  if (entry.ruling) parts.push(`**الحكم:** ${entry.ruling}`);
-  if (entry.details.length) {
-    parts.push(entry.details.slice(0, 2).map((d, i) => `${i + 1}. ${d}`).join("\n"));
-  }
-  if (entry.evidence.length) {
-    parts.push(`**أبرز الأدلة:**\n${entry.evidence.slice(0, 2).map((e) => `- ${e}`).join("\n")}`);
-  }
-  return { title: entry.title, text: parts.join("\n\n"), followUps: entry.followUps };
 }
 
 export function getKnowledgeTopics() {

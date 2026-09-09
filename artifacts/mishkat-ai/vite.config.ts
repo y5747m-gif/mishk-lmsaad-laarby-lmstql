@@ -72,14 +72,6 @@ export default defineConfig({
     fs: {
       strict: true,
     },
-    proxy: {
-      // In dev, forward /api to the API server so video analysis works.
-      // In production the platform path-router already maps /api to the API service.
-      '/api': {
-        target: `http://127.0.0.1:${process.env.API_PROXY_PORT ?? 5000}`,
-        changeOrigin: true,
-      },
-    },
   },
   preview: {
     port,

@@ -30,8 +30,8 @@ paths:
     get:
       operationId: searchChannel
       tags: [channel]
-      summary: Analyze the question and search the channel in depth
-      description: Analyzes the Arabic question (type, keywords, religious topics), searches the configured YouTube channel, mines available captions with timestamps, and returns a grounded Arabic answer with per-video analysis and a synthesized summary.
+      summary: Search the channel and compose an answer
+      description: Searches the configured YouTube channel, retrieves available captions, and returns a grounded Arabic answer with matching videos.
       parameters:
         - name: q
           in: query
@@ -48,14 +48,6 @@ paths:
             minimum: 1
             maximum: 5
             default: 3
-        - name: depth
-          in: query
-          required: false
-          description: How deep the transcript mining goes.
-          schema:
-            type: string
-            enum: [concise, balanced, deep]
-            default: balanced
       responses:
         "200":
           description: Grounded channel answer
@@ -80,36 +72,6 @@ components:
           type: string
       required:
         - status
-    QuestionAnalysis:
-      type: object
-      properties:
-        kind:
-          type: string
-        kindLabel:
-          type: string
-        keywords:
-          type: array
-          items:
-            type: string
-        topics:
-          type: array
-          items:
-            type: string
-      required:
-        - kind
-        - kindLabel
-        - keywords
-        - topics
-    VideoHighlight:
-      type: object
-      properties:
-        text:
-          type: string
-        time:
-          type: string
-      required:
-        - text
-        - time
     ChannelVideo:
       type: object
       properties:
@@ -127,14 +89,6 @@ components:
           type: number
         transcriptAvailable:
           type: boolean
-        topics:
-          type: array
-          items:
-            type: string
-        highlights:
-          type: array
-          items:
-            $ref: "#/components/schemas/VideoHighlight"
       required:
         - videoId
         - title
@@ -143,8 +97,6 @@ components:
         - snippet
         - relevance
         - transcriptAvailable
-        - topics
-        - highlights
     ChannelSearchResponse:
       type: object
       properties:
@@ -165,14 +117,6 @@ components:
         sourceStatus:
           type: string
           enum: [live, cached, metadata-only]
-        analysis:
-          $ref: "#/components/schemas/QuestionAnalysis"
-        summaryPoints:
-          type: array
-          items:
-            type: string
-        coverage:
-          type: number
       required:
         - answer
         - confidence
@@ -181,9 +125,6 @@ components:
         - channelUrl
         - videos
         - sourceStatus
-        - analysis
-        - summaryPoints
-        - coverage
     ApiError:
       type: object
       properties:
@@ -191,3 +132,4 @@ components:
           type: string
       required:
         - error
+
