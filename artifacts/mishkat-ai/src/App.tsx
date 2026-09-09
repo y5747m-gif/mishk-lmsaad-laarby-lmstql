@@ -7,16 +7,14 @@ import NotFound from '@/pages/not-found';
 import {
   ArrowUpLeft,
   BookOpen,
-  Check,
-  CircleHelp,
   Compass,
   Copy,
+  Layers,
   Lightbulb,
   LibraryBig,
   Menu,
   MessageCircle,
   Moon,
-  MoreHorizontal,
   Plus,
   RotateCcw,
   ScrollText,
@@ -28,14 +26,41 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  X,
+  Video,
 } from 'lucide-react';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import '@/index.css';
-import { answerLocally, type AnswerDepth, type AnswerMode } from '@/lib/local-engine';
+import {
+  answerLocally,
+  compactAnswer,
+  type AnswerDepth,
+  type AnswerMode,
+} from '@/lib/local-engine';
+import { renderAnswerMarkdown } from '@/lib/markdown';
 
 type Depth = 'مختصر' | 'متوازن' | 'متعمّق';
 type Mode = 'استكشاف' | 'تعلّم' | 'تفكير';
+
+type VideoHighlight = { text: string; time: string };
+
+type ChannelVideo = {
+  videoId: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  snippet: string;
+  relevance: number;
+  transcriptAvailable: boolean;
+  topics?: string[];
+  highlights?: VideoHighlight[];
+};
+
+type QuestionAnalysisInfo = {
+  kindLabel: string;
+  keywords: string[];
+  topics: string[];
+};
+
 type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -49,16 +74,10 @@ type Message = {
   confidence?: number;
   sourceStatus?: 'live' | 'cached' | 'metadata-only' | 'local';
   videos?: ChannelVideo[];
+  analysis?: QuestionAnalysisInfo;
+  coverage?: number;
 };
-type ChannelVideo = {
-  videoId: string;
-  title: string;
-  url: string;
-  thumbnail: string;
-  snippet: string;
-  relevance: number;
-  transcriptAvailable: boolean;
-};
+
 type Conversation = {
   id: string;
   title: string;
@@ -70,10 +89,10 @@ const queryClient = new QueryClient();
 const STORAGE_KEY = 'mishkat-conversations-v1';
 
 const suggestions = [
-  { label: 'كيف أبدأ عادة القراءة؟', note: 'خطوات صغيرة تستمر', icon: BookOpen },
-  { label: 'ما الفرق بين الحكمة والمعرفة؟', note: 'سؤال في المعنى', icon: Lightbulb },
-  { label: 'كيف أتخذ قرارًا صعبًا؟', note: 'أداة للتفكير الهادئ', icon: Compass },
-  { label: 'احكِ لي عن ابن الهيثم', note: 'نافذة على فكرة', icon: ScrollText },
+  { label: 'ما هي أركان الصلاة وشروطها؟', note: 'سؤال فقه تفصيلي', icon: ScrollText },
+  { label: 'ما الفرق بين العمرة والحج؟', note: 'فرق بين أمرين', icon: Compass },
+  { label: 'كيف أبدأ عادة قراءة القرآن؟', note: 'خطوات تستمر', icon: BookOpen },
+  { label: 'ما حكم الربا في المعاملات؟', note: 'حكم شرعي', icon: Lightbulb },
 ];
 
 const starter: Conversation = { id: 'welcome', title: 'مساحة جديدة', updatedAt: Date.now(), messages: [] };
@@ -81,6 +100,12 @@ const starter: Conversation = { id: 'welcome', title: 'مساحة جديدة', u
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+const DEPTH_PARAM: Record<Depth, 'concise' | 'balanced' | 'deep'> = {
+  مختصر: 'concise',
+  متوازن: 'balanced',
+  'متعمّق': 'deep',
+};
 
 function buildAnswer(question: string, depth: Depth, mode: Mode): Message {
   const depthMap: Record<Depth, AnswerDepth> = {
@@ -105,32 +130,66 @@ function buildAnswer(question: string, depth: Depth, mode: Mode): Message {
     signal: `${result.confidence}% ثقة محلية`,
     depth,
     sourceStatus: 'local',
+    analysis: { kindLabel: result.analysis.kindLabel, keywords: result.analysis.keywords, topics: result.analysis.topics },
   };
 }
 
-function buildChannelAnswer(result: {
+type ChannelSearchPayload = {
   answer: string;
   confidence: number;
   matchedTopic: string;
+  channelName: string;
+  channelUrl: string;
   videos: ChannelVideo[];
   sourceStatus: 'live' | 'cached' | 'metadata-only';
-}, depth: Depth): Message {
+  analysis: QuestionAnalysisInfo;
+  summaryPoints: string[];
+  coverage: number;
+};
+
+function buildChannelAnswer(result: ChannelSearchPayload, depth: Depth, question: string, mode: Mode): Message {
   const sourceLabel =
     result.sourceStatus === 'live'
       ? 'مستخلص من القناة الآن'
       : result.sourceStatus === 'cached'
         ? 'مستخلص من نسخة القناة المحفوظة'
         : 'مطابقة عنوان فقط';
+
+  const local = compactAnswer(question);
+  const weakChannelCoverage = result.sourceStatus === 'metadata-only' || result.coverage < 62;
+
+  let text = result.answer;
+  let title = result.matchedTopic;
+  let signal =
+    result.sourceStatus === 'metadata-only'
+      ? sourceLabel
+      : `تعمّق في ${result.videos.length > 1 ? `${result.videos.length} فيديوهات` : 'فيديو'} · تغطية ${result.coverage}%`;
+
+  if (weakChannelCoverage && local) {
+    // القناة لم تغطِّ السؤال بالكامل: نكمل من القاعدة المعرفية المحلية
+    if (result.sourceStatus === 'metadata-only') {
+      text = local.text;
+      title = local.title;
+      signal = `إجابة معرفية محلية · ${sourceLabel}`;
+    } else {
+      text = `${result.answer}\n\n## إضافة معرفية\n${local.text}`;
+      signal = `${signal} + إضافة معرفية`;
+    }
+  }
+
   return {
     id: makeId(),
     role: 'assistant',
-    title: result.matchedTopic,
-    text: result.answer,
+    title,
+    text,
     videos: result.videos,
     confidence: result.confidence,
-    signal: sourceLabel,
+    signal,
     depth,
     sourceStatus: result.sourceStatus,
+    analysis: result.analysis,
+    coverage: result.coverage,
+    followUps: local?.followUps,
   };
 }
 
@@ -191,20 +250,15 @@ function AppShell() {
     void (async () => {
       let answer: Message;
       try {
-        const response = await fetch(`/api/channel/search?q=${encodeURIComponent(text)}&limit=3`, {
-          headers: { Accept: 'application/json' },
-        });
+        const response = await fetch(
+          `/api/channel/search?q=${encodeURIComponent(text)}&limit=3&depth=${DEPTH_PARAM[depth]}`,
+          { headers: { Accept: 'application/json' } },
+        );
         if (!response.ok) throw new Error('channel-search-failed');
-        const result = (await response.json()) as {
-          answer: string;
-          confidence: number;
-          matchedTopic: string;
-          videos: ChannelVideo[];
-          sourceStatus: 'live' | 'cached' | 'metadata-only';
-        };
-        answer = buildChannelAnswer(result, depth);
+        const result = (await response.json()) as ChannelSearchPayload;
+        answer = buildChannelAnswer(result, depth, text, mode);
       } catch {
-        // Keep the app useful when YouTube is temporarily unavailable.
+        // نبقى مفيدًا حتى لو تعذر الوصول إلى القناة مؤقتًا.
         answer = buildAnswer(text, depth, mode);
       }
       const finished = { ...nextCurrent, updatedAt: Date.now(), messages: [...nextMessages, answer] };
@@ -246,7 +300,7 @@ function AppShell() {
           ))}
         </div>
         <div className="sidebar-bottom">
-          <div className="privacy-note"><ShieldCheck size={16} /><span>لا تسجيل دخول. المحادثات تحفظ محليًا، والسؤال يرسل فقط للبحث في القناة.</span></div>
+          <div className="privacy-note"><ShieldCheck size={16} /><span>لا تسجيل دخول. المحادثات تحفظ محليًا، والسؤال يُرسل لتحليله والبحث في القناة.</span></div>
           <button className="sidebar-action" onClick={clearHistory} data-testid="button-clear-history"><Trash2 size={14} /> مسح المحفوظات المحلية</button>
           <button className="sidebar-action" onClick={() => setDark((value) => !value)} data-testid="button-toggle-theme">{dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? 'الوضع النهاري' : 'الوضع الليلي'}</button>
         </div>
@@ -273,7 +327,7 @@ function AppShell() {
               <section className="welcome">
                 <div className="eyebrow"><Sparkles size={13} /> مساعد مستقل، من داخل مِشكاة</div>
                 <h1>أهلًا بك في <em>مِشكاة</em></h1>
-                <p>اسأل كما تفكر. نرتّب لك الإجابة، ونترك لك مساحة لتتأملها.<br />من المعرفة إلى الحياة اليومية، هنا يبدأ السؤال الجيد.</p>
+                <p>أحلّل سؤالك، أتعمّق في فيديوهات القناة، وأرتّب لك كل التفاصيل.<br />من السؤال إلى الحكم إلى الدليل، هنا يبدأ السؤال الجيد.</p>
               </section>
               <section className="suggestions" aria-label="أسئلة مقترحة">
                 {suggestions.map(({ label, note, icon: Icon }) => (
@@ -300,7 +354,18 @@ function AppShell() {
                   <div className="message-bubble" data-testid={`text-assistant-message-${message.id}`}>
                     <div className="answer-meta"><span className="signal"><Sparkles size={11} /> {message.signal}</span><span>إجابة {message.depth}</span></div>
                     <h3 className="answer-title">{message.title}</h3>
-                    <div className="answer-body">{message.text}</div>
+                    {message.analysis && message.analysis.kindLabel && (
+                      <div className="analysis-chips">
+                        <span className="chip chip-kind"><Layers size={11} /> {message.analysis.kindLabel}</span>
+                        {message.analysis.topics.map((topic) => (
+                          <span className="chip" key={topic}>{topic}</span>
+                        ))}
+                        {message.analysis.keywords.map((keyword) => (
+                          <span className="chip chip-key" key={keyword}>{keyword}</span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="answer-body">{renderAnswerMarkdown(message.text)}</div>
                     {message.points && <ul className="answer-points">{message.points.map((point) => <li key={point}>{point}</li>)}</ul>}
                     {message.sources && message.sources.length > 0 && (
                       <div className="answer-sources">
@@ -318,16 +383,40 @@ function AppShell() {
                     )}
                     {message.videos && message.videos.length > 0 && (
                       <div className="channel-videos">
-                        <div className="sources-heading"><BookOpen size={13} /> فيديوهات مرتبطة من القناة</div>
+                        <div className="sources-heading"><Video size={13} /> فيديوهات مرتبطة من القناة</div>
                         <div className="video-list">
                           {message.videos.map((video) => (
                             <a className="video-card" href={video.url} target="_blank" rel="noreferrer" key={video.videoId}>
                               <img src={video.thumbnail} alt="" loading="lazy" />
-                              <span className="video-card-copy"><strong>{video.title}</strong><small>{video.transcriptAvailable ? 'يتوفر نص مستخلص' : 'مطابقة من العنوان'}</small></span>
+                              <span className="video-card-copy">
+                                <strong>{video.title}</strong>
+                                {video.topics && video.topics.length > 0 ? (
+                                  <span className="video-topics">
+                                    {video.topics.slice(0, 3).map((topic) => <span className="video-topic-chip" key={topic}>{topic}</span>)}
+                                  </span>
+                                ) : (
+                                  <small>{video.transcriptAvailable ? 'نص مستخلص' : 'مطابقة من العنوان'}</small>
+                                )}
+                              </span>
+                              {video.highlights && video.highlights[0] && (
+                                <span className="video-time-badge">{video.highlights[0].time}</span>
+                              )}
                               <ArrowUpLeft size={13} />
                             </a>
                           ))}
                         </div>
+                        {message.videos.some((video) => video.highlights && video.highlights.length > 0) && (
+                          <div className="video-highlights">
+                            {message.videos.map((video) =>
+                              video.highlights?.map((highlight, hi) => (
+                                <blockquote className="video-highlight" key={`${video.videoId}-${hi}`}>
+                                  «{highlight.text}»
+                                  <span className="video-highlight-meta">— من «{video.title}» ({highlight.time})</span>
+                                </blockquote>
+                              )),
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="answer-actions">
@@ -358,7 +447,7 @@ function AppShell() {
                 <div className="toolbar-left"><span style={{ color: 'hsl(var(--muted-foreground) / .7)', fontSize: 10 }}>Enter للإرسال</span><button className="send-btn" type="submit" disabled={!question.trim() || isTyping} aria-label="إرسال السؤال" data-testid="button-send"><Send size={16} /></button></div>
               </div>
             </form>
-            <div className="composer-footnote"><ShieldCheck size={11} style={{ verticalAlign: '-2px', marginLeft: 4 }} /> يبحث في قناة «تعلم دينك لتنجو وتسعد» · لا يستخدم مزوّدات ذكاء اصطناعي خارجية</div>
+            <div className="composer-footnote"><ShieldCheck size={11} style={{ verticalAlign: '-2px', marginLeft: 4 }} /> يحلّل سؤالك، ويتعمّق في فيديوهات قناة «تعلم دينك لتنجو وتسعد» · بلا مزوّدات ذكاء اصطناعي خارجية</div>
           </div>
         </main>
       </section>

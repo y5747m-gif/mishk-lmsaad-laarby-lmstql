@@ -18,8 +18,8 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Searches the configured YouTube channel, retrieves available captions, and returns a grounded Arabic answer with matching videos.
- * @summary Search the channel and compose an answer
+ * Analyzes the Arabic question (type, keywords, religious topics), searches the configured YouTube channel, mines available captions with timestamps, and returns a grounded Arabic answer with per-video analysis and a synthesized summary.
+ * @summary Analyze the question and search the channel in depth
  */
 export const searchChannelQueryQMin = 2;
 export const searchChannelQueryQMax = 500;
@@ -27,11 +27,12 @@ export const searchChannelQueryQMax = 500;
 export const searchChannelQueryLimitDefault = 3;
 export const searchChannelQueryLimitMax = 5;
 
-
+export const searchChannelQueryDepthDefault = `balanced`;
 
 export const SearchChannelQueryParams = zod.object({
   "q": zod.coerce.string().min(searchChannelQueryQMin).max(searchChannelQueryQMax),
-  "limit": zod.coerce.number().int().min(1).max(searchChannelQueryLimitMax).default(searchChannelQueryLimitDefault)
+  "limit": zod.coerce.number().int().min(1).max(searchChannelQueryLimitMax).default(searchChannelQueryLimitDefault),
+  "depth": zod.enum(['concise', 'balanced', 'deep']).default(searchChannelQueryDepthDefault).describe('How deep the transcript mining goes.')
 })
 
 export const SearchChannelResponse = zod.object({
@@ -47,9 +48,22 @@ export const SearchChannelResponse = zod.object({
   "thumbnail": zod.string(),
   "snippet": zod.string(),
   "relevance": zod.number(),
-  "transcriptAvailable": zod.boolean()
+  "transcriptAvailable": zod.boolean(),
+  "topics": zod.array(zod.string()),
+  "highlights": zod.array(zod.object({
+  "text": zod.string(),
+  "time": zod.string()
+}))
 })),
-  "sourceStatus": zod.enum(['live', 'cached', 'metadata-only'])
+  "sourceStatus": zod.enum(['live', 'cached', 'metadata-only']),
+  "analysis": zod.object({
+  "kind": zod.string(),
+  "kindLabel": zod.string(),
+  "keywords": zod.array(zod.string()),
+  "topics": zod.array(zod.string())
+}),
+  "summaryPoints": zod.array(zod.string()),
+  "coverage": zod.number()
 })
 
 

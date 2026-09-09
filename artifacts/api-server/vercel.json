@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "index.mjs": { "maxDuration": 60 },
+    "dist/index.mjs": { "maxDuration": 60 }
+  }
+}
