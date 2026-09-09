@@ -1,6 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
-import pinoHttp from "pino-http";
+// pino-http is a CJS package whose .d.ts is written ESM-style; the named
+// import typechecks under every module mode (bundler/node16/nodenext/commonjs)
+// and resolves at runtime (module.exports.pinoHttp exists).
+import { pinoHttp } from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
