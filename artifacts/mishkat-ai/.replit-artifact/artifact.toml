@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "مِشكاة — المساعد العربي المستقل"
+description = "مساعد عربي مستقل يعمل بمحرك معرفة محلي، يجيب عن الأسئلة العامة والدينية والتعليمية بأسلوب واضح، ويحفظ المحادثات على جهاز المستخدم دون ربط بخدمة ذكاء اصطناعي خارجية."
+version = "1.0.0"
+id = "artifacts/mishkat-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19106
+
+[services.development]
+run = "pnpm --filter @workspace/mishkat-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mishkat-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mishkat-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19106"
+BASE_PATH = "/"
