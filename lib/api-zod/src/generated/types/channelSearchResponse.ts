@@ -7,6 +7,7 @@
  */
 import type { ChannelSearchResponseSourceStatus } from './channelSearchResponseSourceStatus';
 import type { ChannelVideo } from './channelVideo';
+import type { QuestionAnalysis } from './questionAnalysis';
 
 export interface ChannelSearchResponse {
   answer: string;
@@ -16,4 +17,7 @@ export interface ChannelSearchResponse {
   channelUrl: string;
   videos: ChannelVideo[];
   sourceStatus: ChannelSearchResponseSourceStatus;
+  analysis: QuestionAnalysis;
+  summaryPoints: string[];
+  coverage: number;
 }

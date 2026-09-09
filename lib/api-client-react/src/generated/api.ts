@@ -143,8 +143,8 @@ export const getSearchChannelUrl = (params: SearchChannelParams,) => {
 }
 
 /**
- * Searches the configured YouTube channel, retrieves available captions, and returns a grounded Arabic answer with matching videos.
- * @summary Search the channel and compose an answer
+ * Analyzes the Arabic question (type, keywords, religious topics), searches the configured YouTube channel, mines available captions with timestamps, and returns a grounded Arabic answer with per-video analysis and a synthesized summary.
+ * @summary Analyze the question and search the channel in depth
  */
 export const searchChannel = async (params: SearchChannelParams, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSearchResponse> => {
 
@@ -191,7 +191,7 @@ export type SearchChannelQueryError = ErrorType<void | ApiError>
 
 
 /**
- * @summary Search the channel and compose an answer
+ * @summary Analyze the question and search the channel in depth
  */
 
 export function useSearchChannel<TData = Awaited<ReturnType<typeof searchChannel>>, TError = ErrorType<void | ApiError>>(

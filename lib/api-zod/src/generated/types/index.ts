@@ -11,4 +11,7 @@ export * from './channelSearchResponse';
 export * from './channelSearchResponseSourceStatus';
 export * from './channelVideo';
 export * from './healthStatus';
+export * from './questionAnalysis';
+export * from './searchChannelDepth';
 export * from './searchChannelParams';
+export * from './videoHighlight';
