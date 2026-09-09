@@ -10,6 +10,10 @@ globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Dev builds (Replit `pnpm dev`) run the pino-pretty transport worker;
+// production bundles (Vercel) log plain JSON and skip it entirely.
+const isDev = process.env.NODE_ENV === "development";
+
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
@@ -18,6 +22,7 @@ async function buildAll() {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
+    minify: true,
     format: "esm",
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
@@ -104,7 +109,7 @@ async function buildAll() {
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: isDev ? ["pino-pretty"] : [] })
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {

@@ -85,5 +85,12 @@ export default defineConfig({
     port,
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: {
+      // Same as dev: forward /api to the API server in the preview.
+      '/api': {
+        target: `http://127.0.0.1:${process.env.API_PROXY_PORT ?? 5000}`,
+        changeOrigin: true,
+      },
+    },
   },
 });
