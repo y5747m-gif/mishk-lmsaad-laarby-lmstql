@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: channel
+    description: Search and answer from the configured YouTube channel
 paths:
   /healthz:
     get:
@@ -24,6 +26,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /channel/search:
+    get:
+      operationId: searchChannel
+      tags: [channel]
+      summary: Search the channel and compose an answer
+      description: Searches the configured YouTube channel, retrieves available captions, and returns a grounded Arabic answer with matching videos.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 500
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+            default: 3
+      responses:
+        "200":
+          description: Grounded channel answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelSearchResponse"
+        "400":
+          description: Invalid question
+        "502":
+          description: YouTube could not be reached or captions were unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +72,64 @@ components:
           type: string
       required:
         - status
+    ChannelVideo:
+      type: object
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        thumbnail:
+          type: string
+        snippet:
+          type: string
+        relevance:
+          type: number
+        transcriptAvailable:
+          type: boolean
+      required:
+        - videoId
+        - title
+        - url
+        - thumbnail
+        - snippet
+        - relevance
+        - transcriptAvailable
+    ChannelSearchResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        confidence:
+          type: number
+        matchedTopic:
+          type: string
+        channelName:
+          type: string
+        channelUrl:
+          type: string
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChannelVideo"
+        sourceStatus:
+          type: string
+          enum: [live, cached, metadata-only]
+      required:
+        - answer
+        - confidence
+        - matchedTopic
+        - channelName
+        - channelUrl
+        - videos
+        - sourceStatus
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
 

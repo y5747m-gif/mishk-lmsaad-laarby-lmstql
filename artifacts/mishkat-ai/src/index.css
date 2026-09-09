@@ -187,6 +187,15 @@ button { cursor: pointer; }
 .follow-ups { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 15px; color: hsl(var(--muted-foreground)); font-size: 10px; }
 .follow-ups button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 6px 9px; background: transparent; color: hsl(var(--primary)); font-size: 10px; transition: background .18s ease, border-color .18s ease; }
 .follow-ups button:hover { background: hsl(var(--accent) / .08); border-color: hsl(var(--accent) / .42); }
+.channel-videos { margin-top: 18px; padding-top: 14px; border-top: 1px solid hsl(var(--border) / .72); }
+.video-list { display: grid; gap: 8px; }
+.video-card { display: flex; align-items: center; gap: 9px; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 11px; padding: 7px; background: hsl(var(--card) / .72); color: inherit; text-decoration: none; transition: transform .18s ease, border-color .18s ease, background .18s ease; }
+.video-card:hover { transform: translateY(-1px); border-color: hsl(var(--accent) / .55); background: hsl(var(--accent) / .07); }
+.video-card img { width: 66px; height: 38px; object-fit: cover; border-radius: 7px; background: hsl(var(--muted)); flex: 0 0 auto; }
+.video-card-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.video-card-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; }
+.video-card-copy small { color: hsl(var(--muted-foreground)); font-size: 9px; }
+.video-card > svg { color: hsl(var(--accent)); flex: 0 0 auto; }
 .answer-actions { display: flex; gap: 3px; margin-top: 13px; }
 .answer-actions button { border: 0; background: transparent; color: hsl(var(--muted-foreground)); padding: 5px; border-radius: 6px; }
 .answer-actions button:hover { background: hsl(var(--secondary)); color: hsl(var(--primary)); }

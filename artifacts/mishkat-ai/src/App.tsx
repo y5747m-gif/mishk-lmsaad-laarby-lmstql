@@ -47,6 +47,17 @@ type Message = {
   sources?: { title: string; category: string; signal: string }[];
   followUps?: string[];
   confidence?: number;
+  sourceStatus?: 'live' | 'cached' | 'metadata-only' | 'local';
+  videos?: ChannelVideo[];
+};
+type ChannelVideo = {
+  videoId: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  snippet: string;
+  relevance: number;
+  transcriptAvailable: boolean;
 };
 type Conversation = {
   id: string;
@@ -93,6 +104,33 @@ function buildAnswer(question: string, depth: Depth, mode: Mode): Message {
     confidence: result.confidence,
     signal: `${result.confidence}% ثقة محلية`,
     depth,
+    sourceStatus: 'local',
+  };
+}
+
+function buildChannelAnswer(result: {
+  answer: string;
+  confidence: number;
+  matchedTopic: string;
+  videos: ChannelVideo[];
+  sourceStatus: 'live' | 'cached' | 'metadata-only';
+}, depth: Depth): Message {
+  const sourceLabel =
+    result.sourceStatus === 'live'
+      ? 'مستخلص من القناة الآن'
+      : result.sourceStatus === 'cached'
+        ? 'مستخلص من نسخة القناة المحفوظة'
+        : 'مطابقة عنوان فقط';
+  return {
+    id: makeId(),
+    role: 'assistant',
+    title: result.matchedTopic,
+    text: result.answer,
+    videos: result.videos,
+    confidence: result.confidence,
+    signal: sourceLabel,
+    depth,
+    sourceStatus: result.sourceStatus,
   };
 }
 
@@ -150,8 +188,25 @@ function AppShell() {
     setCurrent(nextCurrent);
     setQuestion('');
     setIsTyping(true);
-    window.setTimeout(() => {
-      const answer = buildAnswer(text, depth, mode);
+    void (async () => {
+      let answer: Message;
+      try {
+        const response = await fetch(`/api/channel/search?q=${encodeURIComponent(text)}&limit=3`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error('channel-search-failed');
+        const result = (await response.json()) as {
+          answer: string;
+          confidence: number;
+          matchedTopic: string;
+          videos: ChannelVideo[];
+          sourceStatus: 'live' | 'cached' | 'metadata-only';
+        };
+        answer = buildChannelAnswer(result, depth);
+      } catch {
+        // Keep the app useful when YouTube is temporarily unavailable.
+        answer = buildAnswer(text, depth, mode);
+      }
       const finished = { ...nextCurrent, updatedAt: Date.now(), messages: [...nextMessages, answer] };
       setCurrent(finished);
       setConversations((previous) => {
@@ -160,7 +215,7 @@ function AppShell() {
         return updated;
       });
       setIsTyping(false);
-    }, 700);
+    })();
   };
 
   const clearHistory = () => {
@@ -191,7 +246,7 @@ function AppShell() {
           ))}
         </div>
         <div className="sidebar-bottom">
-          <div className="privacy-note"><ShieldCheck size={16} /><span>خصوصيتك أصل. لا تسجيل دخول، ولا بيانات تغادر جهازك.</span></div>
+          <div className="privacy-note"><ShieldCheck size={16} /><span>لا تسجيل دخول. المحادثات تحفظ محليًا، والسؤال يرسل فقط للبحث في القناة.</span></div>
           <button className="sidebar-action" onClick={clearHistory} data-testid="button-clear-history"><Trash2 size={14} /> مسح المحفوظات المحلية</button>
           <button className="sidebar-action" onClick={() => setDark((value) => !value)} data-testid="button-toggle-theme">{dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? 'الوضع النهاري' : 'الوضع الليلي'}</button>
         </div>
@@ -261,6 +316,20 @@ function AppShell() {
                         {message.followUps.map((followUp) => <button key={followUp} onClick={() => submit(followUp)}>{followUp}<ArrowUpLeft size={12} /></button>)}
                       </div>
                     )}
+                    {message.videos && message.videos.length > 0 && (
+                      <div className="channel-videos">
+                        <div className="sources-heading"><BookOpen size={13} /> فيديوهات مرتبطة من القناة</div>
+                        <div className="video-list">
+                          {message.videos.map((video) => (
+                            <a className="video-card" href={video.url} target="_blank" rel="noreferrer" key={video.videoId}>
+                              <img src={video.thumbnail} alt="" loading="lazy" />
+                              <span className="video-card-copy"><strong>{video.title}</strong><small>{video.transcriptAvailable ? 'يتوفر نص مستخلص' : 'مطابقة من العنوان'}</small></span>
+                              <ArrowUpLeft size={13} />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="answer-actions">
                       <button onClick={() => navigator.clipboard?.writeText(`${message.title}\n\n${message.text}`)} aria-label="نسخ الإجابة" data-testid={`button-copy-answer-${message.id}`}><Copy size={14} /></button>
                       <button aria-label="إجابة مفيدة" data-testid={`button-helpful-${message.id}`}><ThumbsUp size={14} /></button>
@@ -289,7 +358,7 @@ function AppShell() {
                 <div className="toolbar-left"><span style={{ color: 'hsl(var(--muted-foreground) / .7)', fontSize: 10 }}>Enter للإرسال</span><button className="send-btn" type="submit" disabled={!question.trim() || isTyping} aria-label="إرسال السؤال" data-testid="button-send"><Send size={16} /></button></div>
               </div>
             </form>
-            <div className="composer-footnote"><ShieldCheck size={11} style={{ verticalAlign: '-2px', marginLeft: 4 }} /> يعمل محليًا على جهازك · لا يستخدم مزوّدات ذكاء اصطناعي خارجية</div>
+            <div className="composer-footnote"><ShieldCheck size={11} style={{ verticalAlign: '-2px', marginLeft: 4 }} /> يبحث في قناة «تعلم دينك لتنجو وتسعد» · لا يستخدم مزوّدات ذكاء اصطناعي خارجية</div>
           </div>
         </main>
       </section>
