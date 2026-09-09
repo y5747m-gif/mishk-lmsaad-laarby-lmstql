@@ -62,6 +62,18 @@
 - The Vite config requires `PORT` and `BASE_PATH` when invoking a build directly; managed workflows inject them automatically.
 - The assistant is intentionally local and knowledge-bounded; do not add an external LLM call without an explicit product decision.
 
+## Deployment (Vercel)
+
+- API server (`artifacts/api-server`): dual-mode entry. Locally it runs as a
+  long-lived server (`PORT` required); on Vercel it exports a request handler
+  (guarded by the `VERCEL` env var) and `vercel.json` sets `maxDuration: 60`.
+- Vercel project settings for the API: Root Directory `artifacts/api-server`,
+  Build Command `pnpm run build`, Output Directory `dist`, Node.js runtime 20+.
+- The frontend (`artifacts/mishkat-ai`) is a Vite static build; deploy it as a
+  separate Vercel project and rewrite `/api/*` to the API project's URL, or
+  keep calling it via the API's absolute URL. The client falls back to the
+  local engine automatically when the API is unreachable.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
