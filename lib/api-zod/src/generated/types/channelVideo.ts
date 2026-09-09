@@ -5,7 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { VideoHighlight } from './videoHighlight';
 
 export interface ChannelVideo {
   videoId: string;
@@ -15,6 +14,4 @@ export interface ChannelVideo {
   snippet: string;
   relevance: number;
   transcriptAvailable: boolean;
-  topics: string[];
-  highlights: VideoHighlight[];
 }

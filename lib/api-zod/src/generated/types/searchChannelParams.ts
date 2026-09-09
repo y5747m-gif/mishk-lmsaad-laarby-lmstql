@@ -5,7 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { SearchChannelDepth } from './searchChannelDepth';
 
 export type SearchChannelParams = {
 /**
@@ -18,8 +17,4 @@ q: string;
  * @maximum 5
  */
 limit?: number;
-/**
- * How deep the transcript mining goes.
- */
-depth?: SearchChannelDepth;
 };

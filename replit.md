@@ -26,25 +26,16 @@
 ## Where things live
 
 - `artifacts/mishkat-ai/src/App.tsx` — RTL chat shell, local history, controls, and conversation UI
-- `artifacts/mishkat-ai/src/lib/local-engine.ts` — standalone Arabic question-analysis and answer-composition engine
-- `artifacts/mishkat-ai/src/lib/knowledge-base.ts` — local knowledge base: 14 religious domains (prayer, purification, fasting, zakat, hajj, repentance, Quran, Sunnah, creed, morals, inheritance, marriage, transactions, du'a) + 5 general domains
-- `artifacts/mishkat-ai/src/lib/markdown.tsx` — mini markdown renderer for the constrained answer format
-- `artifacts/api-server/src/lib/youtube-channel.ts` — deep video analyst: question analysis, transcript mining with timestamps, per-video topic detection, synthesized summary
-- `artifacts/api-server/src/lib/question-analyzer.ts` — question type (ruling/definition/howto/...), keyword extraction, religious topic detection
-- `artifacts/api-server/src/lib/religion-taxonomy.ts` — shared religious topic taxonomy (16 topics, synonym terms)
-- `artifacts/api-server/src/lib/arabic.ts` — Arabic normalization, tokenization, lightweight stemming
+- `artifacts/mishkat-ai/src/lib/local-engine.ts` — standalone Arabic retrieval-and-composition engine
 - `artifacts/mishkat-ai/src/index.css` — visual system and responsive layout
 - `artifacts/mishkat-ai/.replit-artifact/artifact.toml` — web artifact routing and workflow
 
 ## Architecture decisions
 
-- The assistant remains usable without API keys, auth, or third-party AI providers. No external LLM calls.
-- Every question is first analyzed (type: ruling/definition/howto/reason/evidence/difference, keywords, religious topics). The analysis is visible to the user as chips above the answer.
-- Video grounding is deep, not surface: the API mines full transcripts (sentence segmentation with timestamps), scores sentences against the analyzed question terms (question words weigh more than topic synonyms), deduplicates overlapping quotes, detects what each video covers, and synthesizes a "summary of details" across videos.
-- When the channel does not cover the question well (low coverage or metadata-only), the local knowledge base fills the gap — the answer then merges video material with a local knowledge section, so religious questions always get a full structured answer (ruling, details, Quran/hadith evidence, practical steps).
-- Answer depth (مختصر/متوازن/متعمّق) is an explicit control and is passed to the API (`depth=concise|balanced|deep`), which changes how many quotes and summary points are produced.
+- The first release is frontend-only so the assistant remains usable without API keys, auth, or third-party AI providers.
+- Knowledge retrieval and answer composition happen in `local-engine.ts`; the UI stores only local conversation state in browser `localStorage`.
+- Answer depth and intent are explicit controls so users can choose compact, balanced, educational, or practical responses.
 - Confidence and internal knowledge signals are shown instead of presenting local matches as universal certainty.
-- In dev, the Vite server proxies `/api` to the API server (port 5000 by default, override with `API_PROXY_PORT`). In production the platform path-router maps `/api` to the API service.
 
 ## Product
 
@@ -61,18 +52,6 @@
 
 - The Vite config requires `PORT` and `BASE_PATH` when invoking a build directly; managed workflows inject them automatically.
 - The assistant is intentionally local and knowledge-bounded; do not add an external LLM call without an explicit product decision.
-
-## Deployment (Vercel)
-
-- API server (`artifacts/api-server`): dual-mode entry. Locally it runs as a
-  long-lived server (`PORT` required); on Vercel it exports a request handler
-  (guarded by the `VERCEL` env var) and `vercel.json` sets `maxDuration: 60`.
-- Vercel project settings for the API: Root Directory `artifacts/api-server`,
-  Build Command `pnpm run build`, Output Directory `dist`, Node.js runtime 20+.
-- The frontend (`artifacts/mishkat-ai`) is a Vite static build; deploy it as a
-  separate Vercel project and rewrite `/api/*` to the API project's URL, or
-  keep calling it via the API's absolute URL. The client falls back to the
-  local engine automatically when the API is unreachable.
 
 ## Pointers
 

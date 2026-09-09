@@ -15,11 +15,7 @@ router.get("/channel/search", async (req, res) => {
   }
 
   try {
-    const result = await searchChannel(
-      parsed.data.q,
-      parsed.data.limit,
-      parsed.data.depth,
-    );
+    const result = await searchChannel(parsed.data.q, parsed.data.limit);
     res.json(SearchChannelResponse.parse(result));
   } catch (error) {
     req.log.error({ err: error }, "YouTube channel search failed");

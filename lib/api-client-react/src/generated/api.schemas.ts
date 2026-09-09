@@ -9,18 +9,6 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface QuestionAnalysis {
-  kind: string;
-  kindLabel: string;
-  keywords: string[];
-  topics: string[];
-}
-
-export interface VideoHighlight {
-  text: string;
-  time: string;
-}
-
 export interface ChannelVideo {
   videoId: string;
   title: string;
@@ -29,8 +17,6 @@ export interface ChannelVideo {
   snippet: string;
   relevance: number;
   transcriptAvailable: boolean;
-  topics: string[];
-  highlights: VideoHighlight[];
 }
 
 export type ChannelSearchResponseSourceStatus = typeof ChannelSearchResponseSourceStatus[keyof typeof ChannelSearchResponseSourceStatus];
@@ -50,9 +36,6 @@ export interface ChannelSearchResponse {
   channelUrl: string;
   videos: ChannelVideo[];
   sourceStatus: ChannelSearchResponseSourceStatus;
-  analysis: QuestionAnalysis;
-  summaryPoints: string[];
-  coverage: number;
 }
 
 export interface ApiError {
@@ -70,18 +53,5 @@ q: string;
  * @maximum 5
  */
 limit?: number;
-/**
- * How deep the transcript mining goes.
- */
-depth?: SearchChannelDepth;
 };
-
-export type SearchChannelDepth = typeof SearchChannelDepth[keyof typeof SearchChannelDepth];
-
-
-export const SearchChannelDepth = {
-  concise: 'concise',
-  balanced: 'balanced',
-  deep: 'deep',
-} as const;
 
